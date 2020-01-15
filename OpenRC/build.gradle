@@ -21,7 +21,7 @@ dependencies {
     implementation project (':FtcCommon')
 
     turboImplementation project (':Blocks')
-    turboImplementation project (':RobotServer')
+    //turboImplementation project (':RobotServer')
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 }
