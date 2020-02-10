@@ -1,7 +1,6 @@
 package org.firstinspires.ftc.teamcode.opmodes
 
 import com.acmerobotics.dashboard.FtcDashboard
-import com.acmerobotics.dashboard.config.Config
 import com.acmerobotics.dashboard.config.ValueProvider
 import com.acmerobotics.dashboard.config.variable.BasicVariable
 import com.acmerobotics.dashboard.config.variable.CustomVariable
@@ -12,16 +11,28 @@ import com.acmerobotics.roadrunner.profile.MotionProfileGenerator
 import com.acmerobotics.roadrunner.profile.MotionState
 import com.acmerobotics.roadrunner.util.Angle
 import com.acmerobotics.roadrunner.util.NanoClock
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import com.qualcomm.robotcore.eventloop.opmode.OpModeManager
+import com.qualcomm.robotcore.eventloop.opmode.OpModeRegistrar
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.util.MovingStatistics
 import com.qualcomm.robotcore.util.RobotLog
-import org.firstinspires.ftc.teamcode.api.*
+import org.firstinspires.ftc.robotcore.internal.opmode.OpModeMeta
+import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_BL
+import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_BR
+import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_FL
+import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_FR
+import org.firstinspires.ftc.teamcode.api.DriveConstants
 import org.firstinspires.ftc.teamcode.api.DriveConstants.BASE_CONSTRAINTS
 import org.firstinspires.ftc.teamcode.api.DriveConstants.encoderTicksToInches
 import org.firstinspires.ftc.teamcode.api.DriveConstants.kV
+import org.firstinspires.ftc.teamcode.api.ProgramConstants.DEBUG
+import org.firstinspires.ftc.teamcode.api.Robot
+import org.firstinspires.ftc.teamcode.api.Vision
+import org.firstinspires.ftc.teamcode.api.framework.*
 import kotlin.math.sqrt
+import kotlin.reflect.KClass
 
 // To tune the drivetrain:
 // DriveVelocityPIDTuner - Get the error as reasonably low as possible
@@ -31,13 +42,110 @@ import kotlin.math.sqrt
 // SplineTest - Make sure it's close enough
 // FollowerPID - This gets you the rest of the way
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
+@Suppress("unused")
+object TunerRegistrar {
+    private fun OpModeManager.register(cls: KClass<out OpMode>) {
+        this.register(
+                OpModeMeta(cls.simpleName!!, OpModeMeta.Flavor.AUTONOMOUS, "Tuning"),
+                cls.java)
+        //FtcDashboard.getInstance().configRoot.putVariable(
+        //        ReflectionConfig.createVariableFromClass(cls.java))
+    }
+
+    @JvmStatic
+    @OpModeRegistrar // Tells the FTC SDK to call this method
+    fun registerTuners(mgr: OpModeManager) {
+        if (DEBUG) {
+            mgr.register(DumbWheelSpinner::class)
+            mgr.register(WheelDirectionTester::class)
+            mgr.register(TrackWidthTuner::class)
+            mgr.register(DriveVelocityPIDTuner::class)
+            mgr.register(FollowerPIDTuner::class)
+            mgr.register(TurnTest::class)
+            mgr.register(StraightTest::class)
+            mgr.register(SplineTest::class)
+            mgr.register(VisionTest::class)
+        }
+    }
+}
+
+class DumbWheelSpinner : LinearOpMode() {
+    companion object {
+        @JvmField
+        var PWR = 0.2
+    }
+
+    override fun runOpMode() {
+        val motorFL = hardwareMap.dcMotor[MOTOR_FL].init()
+        val motorBL = hardwareMap.dcMotor[MOTOR_BL].init()
+        val motorBR = hardwareMap.dcMotor[MOTOR_BR].init()
+        val motorFR = hardwareMap.dcMotor[MOTOR_FR].init()
+
+        waitForStart()
+        if (isStopRequested) return
+
+        motorFL.power = PWR
+        motorBL.power = PWR
+        motorBR.power = PWR
+        motorFR.power = PWR
+        while (opModeIsActive()) noop()
+
+        motorFL.power = 0.0
+        motorBL.power = 0.0
+        motorBR.power = 0.0
+        motorFR.power = 0.0
+    }
+}
+
+class WheelDirectionTester : LinearOpMode() {
+    companion object {
+        @JvmField
+        var PWR = 1.0
+    }
+
+    override fun runOpMode() {
+        val robot = Robot(this)
+        robot.dt.initTeleop()
+        waitForStart(robot)
+
+        telemetry.addLine("Front Left")
+        robot.dt.setMotorPowers(PWR, 0.0, 0.0, 0.0)
+        telemetry.update()
+        robot.waitFor { gamepad1.a }
+        sleep(1000)
+
+        telemetry.addLine("Rear Left")
+        robot.dt.setMotorPowers(0.0, PWR, 0.0, 0.0)
+        telemetry.update()
+        robot.waitFor { gamepad1.a }
+        sleep(1000)
+
+        telemetry.addLine("Rear Right")
+        robot.dt.setMotorPowers(0.0, 0.0, PWR, 0.0)
+        telemetry.update()
+        robot.waitFor { gamepad1.a }
+        sleep(1000)
+
+        telemetry.addLine("Front Right")
+        robot.dt.setMotorPowers(0.0, 0.0, 0.0, PWR)
+        telemetry.update()
+        robot.waitFor { gamepad1.a }
+        sleep(1000)
+
+        telemetry.addLine("Full")
+        robot.dt.setMotorPowers(PWR, PWR, PWR, PWR)
+        telemetry.update()
+        robot.waitFor { gamepad1.a }
+        sleep(1000)
+    }
+
+}
+
 class TrackWidthTuner : LinearOpMode() {
     companion object {
         @JvmField
         var ANGLE = 180.0
+
         @JvmField
         var NUM_TRIALS = 5
     }
@@ -86,9 +194,6 @@ class TrackWidthTuner : LinearOpMode() {
     }
 }
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
 class DriveVelocityPIDTuner : LinearOpMode() {
 
     companion object {
@@ -202,9 +307,6 @@ class DriveVelocityPIDTuner : LinearOpMode() {
 
 }
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
 class FollowerPIDTuner : LinearOpMode() {
     companion object {
         @JvmField
@@ -224,9 +326,6 @@ class FollowerPIDTuner : LinearOpMode() {
 
 }
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
 class TurnTest : LinearOpMode() {
     companion object {
         @JvmField
@@ -245,9 +344,6 @@ class TurnTest : LinearOpMode() {
     }
 }
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
 class StraightTest : LinearOpMode() {
     companion object {
         @JvmField
@@ -265,20 +361,28 @@ class StraightTest : LinearOpMode() {
 
 }
 
-@Config
-//@Disabled
-@Autonomous(group = "Tuning")
 class SplineTest : LinearOpMode() {
     override fun runOpMode() {
         val robot = Robot(this)
         waitForStart(robot) || return
 
         robot.execute {
-            robot.dt.splineTo(x = 30.0, y = 30.0)
+            robot.dt.driveTo(x = 30.0, y = 30.0)
         }
         sleep(1000)
         robot.execute {
-            dt.splineTo(0.0, 0.0, reverse = true)
+            dt.driveTo(0.0, 0.0)
         }
     }
+}
+
+class VisionTest : OpMode() {
+
+    val telem = Telemetry()
+    val vision = Vision(hardwareMap, telem) // Store a reference so it doesn't get GC'd
+
+    override fun init() = noop
+
+    override fun loop() = telem.update()
+
 }

@@ -34,9 +34,9 @@ dependencies {
     extremeTurboImplementation project(':FtcCommon')
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-    implementation 'com.acmerobotics.roadrunner:core:0.4.6'
+    implementation 'com.acmerobotics.roadrunner:core:0.5.0-SNAPSHOT'
     implementation 'org.openftc:rev-extensions-2:1.2'
-    implementation 'com.acmerobotics.dashboard:dashboard:0.3.4'
+    implementation 'com.acmerobotics.dashboard:dashboard:0.3.6'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.9.9'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.9.9'
     implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.9.9'
@@ -45,4 +45,5 @@ dependencies {
 }
 repositories {
     mavenCentral()
+    mavenLocal()
 }

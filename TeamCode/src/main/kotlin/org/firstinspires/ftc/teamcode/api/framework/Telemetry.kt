@@ -1,9 +1,9 @@
-package org.firstinspires.ftc.teamcode.api
+package org.firstinspires.ftc.teamcode.api.framework
 
 import com.acmerobotics.dashboard.FtcDashboard
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket
 
-class Telemetry : Updateable {
+class Telemetry : Updatable {
 
     val sources = mutableListOf<TelemetrySource>()
 

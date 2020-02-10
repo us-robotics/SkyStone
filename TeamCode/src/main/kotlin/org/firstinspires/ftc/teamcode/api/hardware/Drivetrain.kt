@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.api
+package org.firstinspires.ftc.teamcode.api.hardware
 
 import com.acmerobotics.roadrunner.control.PIDCoefficients
 import com.acmerobotics.roadrunner.control.PIDFController
@@ -7,36 +7,37 @@ import com.acmerobotics.roadrunner.drive.MecanumDrive
 import com.acmerobotics.roadrunner.followers.HolonomicPIDVAFollower
 import com.acmerobotics.roadrunner.geometry.Pose2d
 import com.acmerobotics.roadrunner.localization.ThreeTrackingWheelLocalizer
-import com.acmerobotics.roadrunner.path.heading.ConstantInterpolator
-import com.acmerobotics.roadrunner.path.heading.LinearInterpolator
-import com.acmerobotics.roadrunner.path.heading.TangentInterpolator
+import com.acmerobotics.roadrunner.localization.TwoTrackingWheelLocalizer
 import com.acmerobotics.roadrunner.profile.MotionProfile
 import com.acmerobotics.roadrunner.profile.MotionProfileGenerator
 import com.acmerobotics.roadrunner.profile.MotionState
-import com.acmerobotics.roadrunner.trajectory.BaseTrajectoryBuilder
 import com.acmerobotics.roadrunner.trajectory.Trajectory
 import com.acmerobotics.roadrunner.trajectory.TrajectoryBuilder
 import com.acmerobotics.roadrunner.trajectory.constraints.MecanumConstraints
-import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryConstraints
 import com.acmerobotics.roadrunner.util.NanoClock
 import com.qualcomm.hardware.bosch.BNO055IMU
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
 import com.qualcomm.robotcore.hardware.DcMotor
 import com.qualcomm.robotcore.hardware.DcMotorEx
+import com.qualcomm.robotcore.hardware.HardwareMap
 import com.qualcomm.robotcore.hardware.PIDFCoefficients
 import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder
 import org.firstinspires.ftc.teamcode.api.DeviceNames.HUB
+import org.firstinspires.ftc.teamcode.api.DeviceNames.HUB2
 import org.firstinspires.ftc.teamcode.api.DeviceNames.IMU
+import org.firstinspires.ftc.teamcode.api.DeviceNames.INTAKE_L
+import org.firstinspires.ftc.teamcode.api.DeviceNames.INTAKE_R
 import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_BL
 import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_BR
 import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_FL
 import org.firstinspires.ftc.teamcode.api.DeviceNames.MOTOR_FR
+import org.firstinspires.ftc.teamcode.api.DeviceNames.ODOM_H
+import org.firstinspires.ftc.teamcode.api.DeviceNames.ODOM_L
+import org.firstinspires.ftc.teamcode.api.DeviceNames.ODOM_R
 import org.firstinspires.ftc.teamcode.api.DriveConstants.BASE_CONSTRAINTS
 import org.firstinspires.ftc.teamcode.api.DriveConstants.HEADING_PID
+import org.firstinspires.ftc.teamcode.api.DriveConstants.MOTOR_VELOCITY_F
 import org.firstinspires.ftc.teamcode.api.DriveConstants.MOTOR_VELO_PID
-import org.firstinspires.ftc.teamcode.api.DriveConstants.ODOM_1_POS
-import org.firstinspires.ftc.teamcode.api.DriveConstants.ODOM_2_POS
-import org.firstinspires.ftc.teamcode.api.DriveConstants.ODOM_3_POS
+import org.firstinspires.ftc.teamcode.api.DriveConstants.PID_DISABLED
 import org.firstinspires.ftc.teamcode.api.DriveConstants.TRACK_WIDTH
 import org.firstinspires.ftc.teamcode.api.DriveConstants.TRANSLATIONAL_PID
 import org.firstinspires.ftc.teamcode.api.DriveConstants.WHEEL_BASE
@@ -44,13 +45,19 @@ import org.firstinspires.ftc.teamcode.api.DriveConstants.encoderTicksToInches
 import org.firstinspires.ftc.teamcode.api.DriveConstants.kA
 import org.firstinspires.ftc.teamcode.api.DriveConstants.kStatic
 import org.firstinspires.ftc.teamcode.api.DriveConstants.kV
+import org.firstinspires.ftc.teamcode.api.OdometryConstants.ODOM_H_POS
+import org.firstinspires.ftc.teamcode.api.OdometryConstants.ODOM_L_POS
+import org.firstinspires.ftc.teamcode.api.OdometryConstants.ODOM_R_POS
+import org.firstinspires.ftc.teamcode.api.OdometryConstants.odomTicksToInches
+import org.firstinspires.ftc.teamcode.api.ProgramConstants.DEBUG
+import org.firstinspires.ftc.teamcode.api.framework.*
 import org.openftc.revextensions2.ExpansionHubEx
 import kotlin.math.PI
 
-class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
-        MecanumDrive(kV, kA, kStatic, WHEEL_BASE, TRACK_WIDTH), Updateable {
+class Drivetrain(hardwareMap: HardwareMap, telemetry: Telemetry?) :
+        MecanumDrive(kV, kA, kStatic, WHEEL_BASE, TRACK_WIDTH), Updatable {
 
-    private enum class Mode { IDLE, TURN, FOLLOW_TRAJECTORY }
+    private enum class Mode { TELEOP, IDLE, TURN, FOLLOW_TRAJECTORY }
 
     private var mode = Mode.IDLE
     override val busy: Boolean
@@ -59,44 +66,58 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
     override fun update() {
         updatePoseEstimate()
         when (mode) {
-            Mode.IDLE -> setDriveSignal(DriveSignal()) // Do nothing
+            Mode.TELEOP -> noop() // Do nothing and allow something external to move the robot
+            Mode.IDLE -> setDriveSignal(DriveSignal()) // Do nothing and don't move
             Mode.TURN -> updateTurn() // Continue turning
             Mode.FOLLOW_TRAJECTORY -> updateTrajectory() // Continue following trajectory
         }
+    }
+
+    fun initTeleop() {
+        mode = Mode.TELEOP
+        //autoTelem.unregister() // We don't need the auto telemetry in TeleOp
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Hardware
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    private val hub = opMode.hardwareMap[ExpansionHubEx::class.java, HUB]
-    private val imu = opMode.hardwareMap[BNO055IMU::class.java, IMU].apply {
+    private val hub = hardwareMap[ExpansionHubEx::class.java, HUB]
+    private val hub2 = hardwareMap[ExpansionHubEx::class.java, HUB2]
+
+    private val imu = hardwareMap[BNO055IMU::class.java, IMU].apply {
         val params = BNO055IMU.Parameters()
         params.angleUnit = BNO055IMU.AngleUnit.RADIANS
         initialize(params)
         remapAxes(AxesOrder.XYZ, AxesSigns.NPN)
     }
 
-    private val leftFront = (opMode.hardwareMap.dcMotor[MOTOR_FL] as DcMotorEx).init(reverse = true)
-    private val leftRear = (opMode.hardwareMap.dcMotor[MOTOR_BL] as DcMotorEx).init(reverse = true)
-    private val rightRear = (opMode.hardwareMap.dcMotor[MOTOR_BR] as DcMotorEx).init()
-    private val rightFront = (opMode.hardwareMap.dcMotor[MOTOR_FR] as DcMotorEx).init()
+    private val leftFront = (hardwareMap.dcMotor[MOTOR_FL] as DcMotorEx).init(reverse = true)
+    private val leftRear = (hardwareMap.dcMotor[MOTOR_BL] as DcMotorEx).init(reverse = true)
+    private val rightRear = (hardwareMap.dcMotor[MOTOR_BR] as DcMotorEx).init()
+    private val rightFront = (hardwareMap.dcMotor[MOTOR_FR] as DcMotorEx).init()
     private val motors = listOf(leftFront, leftRear, rightRear, rightFront)
 
     init {
-        LynxModuleUtil.ensureMinFWVersion(opMode.hardwareMap)
+        LynxModuleUtil.ensureMinFWVersion(hardwareMap)
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Localization
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
+    private val odomMotors = listOf(
+            hardwareMap.dcMotor[ODOM_L], hardwareMap.dcMotor[ODOM_R],
+            hardwareMap.dcMotor[ODOM_H]
+    )
+
     init {
         localizer = object : ThreeTrackingWheelLocalizer(listOf(
-                ODOM_1_POS, ODOM_2_POS, ODOM_3_POS
+                ODOM_L_POS, ODOM_R_POS, ODOM_H_POS
         )) {
             override fun getWheelPositions(): List<Double> {
-                TODO()
+                val bulkData = hub2.bulkInputData
+                return odomMotors.map { bulkData.getMotorCurrentPosition(it) }.map { odomTicksToInches(it) }
             }
         }
     }
@@ -105,41 +126,63 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
     // Telemetry
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    init {
+    init { // Register telemetry relevent for both TeleOp and Auto
         TelemetrySource {
-            put("mode", mode)
 
-            put("x", poseEstimate.x)
-            put("y", poseEstimate.y)
             put("heading", poseEstimate.heading)
 
-            put("imu1", imu.angularOrientation.firstAngle)
-            put("imu2", imu.angularOrientation.secondAngle)
-            put("imu3", imu.angularOrientation.thirdAngle)
-
-            val err = when (mode) {
-                Mode.IDLE -> Pose2d()
-                Mode.TURN -> Pose2d(0.0, 0.0, turnController.lastError)
-                Mode.FOLLOW_TRAJECTORY -> follower.lastError
+            if (DEBUG) { // This data isn't useful when debug is turned off
+                put("imu1", imu.angularOrientation.firstAngle)
+                put("imu2", imu.angularOrientation.secondAngle)
+                put("imu3", imu.angularOrientation.thirdAngle)
             }
-            put("xErr", err.x)
-            put("yErr", err.y)
-            put("headingErr", err.heading)
 
-            // Draw the robot on the field
-            val field = fieldOverlay()
-            field.setFill("black")
-            field.fillCircle(poseEstimate.x, poseEstimate.y, 10.0)
-            field.setFill("blue")
-            field.fillCircle(poseEstimate.x, poseEstimate.y, 2.0)
-            field.setStroke("blue")
-            field.setStrokeWidth(1)
-            val vec = poseEstimate.headingVec() * 10.0
-            field.strokeLine(poseEstimate.x, poseEstimate.y,
-                    poseEstimate.x + vec.x, poseEstimate.y + vec.y)
-            // TODO: Draw path in FOLLOW_TRAJECTORY
+            // Wheel velocities
+            if (DEBUG) { // Adds an extra bulk read so let's avoid it by default
+                val velocs = getWheelVelocities()
+                put("flVelo", velocs[0])
+                put("blVelo", velocs[1])
+                put("brVelo", velocs[2])
+                put("frVelo", velocs[3])
+            }
+
+            // Odometry
+            if (DEBUG) { // Adds extra bulk reads so let's avoid it by default
+                put("odomLeftPos", odomMotors[0].currentPosition)
+                put("odomRightPos", odomMotors[1].currentPosition)
+                put("odomHorizPos", odomMotors[2].currentPosition)
+            }
         }.register(telemetry)
     }
+
+    val autoTelem = TelemetrySource {
+        put("mode", mode)
+
+        put("x", poseEstimate.x)
+        put("y", poseEstimate.y)
+
+        val err = when (mode) {
+            Mode.IDLE, Mode.TELEOP -> Pose2d()
+            Mode.TURN -> Pose2d(0.0, 0.0, turnController.lastError)
+            Mode.FOLLOW_TRAJECTORY -> follower.lastError
+        }
+        put("xErr", err.x)
+        put("yErr", err.y)
+        put("headingErr", err.heading)
+
+        // Draw the robot on the field
+        val field = fieldOverlay()
+        field.setFill("black")
+        field.fillCircle(poseEstimate.x, poseEstimate.y, 10.0)
+        field.setFill("blue")
+        field.fillCircle(poseEstimate.x, poseEstimate.y, 2.0)
+        field.setStroke("blue")
+        field.setStrokeWidth(1)
+        val vec = poseEstimate.headingVec() * 10.0
+        field.strokeLine(poseEstimate.x, poseEstimate.y,
+                poseEstimate.x + vec.x, poseEstimate.y + vec.y)
+        // TODO: Draw path in FOLLOW_TRAJECTORY
+    }.register(telemetry)
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
     // Trajectory
@@ -156,7 +199,7 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
      * @see followTrajectory
      * @return A new TrajectoryBuilder
      */
-    fun trajectoryBuilder() = TrajectoryBuilder(poseEstimate, constraints)
+    fun trajectoryBuilder() = TrajectoryBuilder(startPose = poseEstimate, constraints = constraints)
 
     /**
      * Follow a given trajectory
@@ -206,21 +249,20 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
      * Drive in a spline
      *
      * Angle mode:
-     * - If heading is null or forceTan is true, robot is tangential to the path.
-     * - If heading == current, robot stays at a constant heading.
-     * - If heading != current, robot will rotate as it moves.
+     * - If heading is null and tan is false, robot stays @ constant heading
+     * - If tan is true or reverse is true, robot is tangential to path
+     * - If heading != null and tan is false, robot will rotate as it moves
      *
      * @param x Target X position. Current if null
      * @param y Target Y position. Current if null
      * @param heading The heading that the robot should end up facing. Current if null
-     * @param reverse Run in reverse
-     * @param forceTan Force tangential heading
+     * @param approach The angle to approach the destination point from
+     * @param tan Force tangential heading
      * @see drive
      */
-    fun splineTo(x: Double? = null, y: Double? = null, heading: Double? = null,
-                 reverse: Boolean = false, forceTan: Boolean = false) = drive {
-        if (reverse) reverse()
-        splineTo(x, y, heading, forceTan)
+    fun driveTo(x: Double? = null, y: Double? = null, heading: Double? = null,
+                approach: Double? = null, tan: Boolean = false, linear: Boolean = false) = drive {
+        driveTo(x, y, heading, approach, tan, linear)
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -295,7 +337,9 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
 
     override fun getWheelPositions(): List<Double> {
         val bulkData = hub.bulkInputData!!
-        return motors.map { encoderTicksToInches(bulkData.getMotorCurrentPosition(it)) }
+        return motors.map {
+            bulkData.getMotorCurrentPosition(it)
+        }.map { encoderTicksToInches(it) }
     }
 
     override fun setMotorPowers(frontLeft: Double, rearLeft: Double, rearRight: Double, frontRight: Double) {
@@ -311,8 +355,8 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     init { // Import existing tuning settings if configured
-        if (MOTOR_VELO_PID != null)
-            setPIDCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, MOTOR_VELO_PID!!)
+        if (MOTOR_VELO_PID != PID_DISABLED)
+            setPIDCoefficients(DcMotor.RunMode.RUN_USING_ENCODER, MOTOR_VELO_PID)
     }
 
     private var lastWheelPositions: List<Double>? = null
@@ -326,7 +370,7 @@ class MecanumDrive(opMode: LinearOpMode, telemetry: Telemetry?) :
     fun setPIDCoefficients(runMode: DcMotor.RunMode, coeff: PIDCoefficients) {
         motors.forEach {
             it.setPIDFCoefficients(runMode, PIDFCoefficients(
-                    coeff.kP, coeff.kI, coeff.kD, 1.0
+                    coeff.kP, coeff.kI, coeff.kD, MOTOR_VELOCITY_F
             ))
         }
     }

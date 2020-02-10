@@ -1,37 +1,64 @@
 package org.firstinspires.ftc.teamcode.opmodes
 
-import com.acmerobotics.dashboard.config.Config
 import com.acmerobotics.roadrunner.drive.DriveSignal
 import com.acmerobotics.roadrunner.geometry.Pose2d
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.eventloop.opmode.OpMode
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp
+import org.firstinspires.ftc.teamcode.api.hardware.Depositor.Position.*
+import org.firstinspires.ftc.teamcode.api.DriveConstants
 import org.firstinspires.ftc.teamcode.api.DriveConstants.BASE_CONSTRAINTS
 import org.firstinspires.ftc.teamcode.api.Robot
-import org.firstinspires.ftc.teamcode.api.rad
-import org.firstinspires.ftc.teamcode.api.waitForStart
+import org.firstinspires.ftc.teamcode.api.ToggleableGamepad
+import org.firstinspires.ftc.teamcode.api.ToggleableGamepad.Mode.TOGGLE
+import kotlin.math.sign
 
 @TeleOp
-@Config
-class TeleOp : LinearOpMode() {
+class TeleOp : OpMode() {
+    // Convert joystick inputs into an exponential scale
+    private val Double.exp: Double
+        get() = sign(this) * this * this
 
-    companion object {
-        @JvmField var START_POS_X = -32.7
-        @JvmField var START_POS_Y = -62.0
-        @JvmField var START_POS_HEADING = 90.rad
+    private lateinit var robot: Robot
+
+    // Gamepads with toggleable buttons
+    private val gamepadDrive = ToggleableGamepad(gamepad1, rbMode = TOGGLE)
+    private val gamepadAux = ToggleableGamepad(gamepad2, aMode = TOGGLE)
+
+    // Set up the robot
+    override fun init() {
+        robot = Robot(this)
+        robot.run {
+            dt.initTeleop()
+            depositor.position = DOWN
+            fg.grabbing = true
+        }
     }
 
-    override fun runOpMode() {
-        val robot = Robot(this)
-        robot.dt.poseEstimate = Pose2d(START_POS_X, START_POS_Y, START_POS_HEADING)
-        waitForStart(robot) || return
+    override fun loop() = robot.run {
+        // Driving
+        val velMultiplier = if (gamepad1.left_bumper) 0.3 else 1.0
+        val maxVel = BASE_CONSTRAINTS.maxVel * velMultiplier
+        val maxAngVel = BASE_CONSTRAINTS.maxAngVel * velMultiplier
+        dt.setDriveSignal(DriveSignal(Pose2d(
+                x = -(gamepadDrive.leftStickX.exp * maxVel),
+                y = (gamepadDrive.leftStickY.exp * maxVel),
+                heading = -(gamepadDrive.rightStickX.exp * maxAngVel)
+        )))
 
-        while (opModeIsActive()) {
-            robot.dt.setDriveSignal(DriveSignal(Pose2d(
-                    x = -(gamepad1.left_stick_y * BASE_CONSTRAINTS.maxVel),
-                    y = -(gamepad1.left_stick_x * BASE_CONSTRAINTS.maxVel),
-                    heading = -(gamepad1.right_stick_x * BASE_CONSTRAINTS.maxAngVel)
-            )))
-            robot.update()
+        // Aux. systems
+        intake.power = gamepadAux.rightStickY
+        lift.power = -gamepadAux.leftStickY // TODO: Make this not bad
+        fg.grabbing = !gamepadDrive.rightBumper.value
+        depositor.grabbing = gamepadAux.a.value
+
+        // TODO: Make this not bad
+        depositor.position = when {
+            gamepad2.right_bumper -> OUT
+            gamepad2.left_bumper -> IDLE
+            else -> DOWN
         }
+
+        // Update the hardware and telemetry
+        update()
     }
 }

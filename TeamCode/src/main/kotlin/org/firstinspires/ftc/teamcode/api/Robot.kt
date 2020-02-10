@@ -1,14 +1,19 @@
 package org.firstinspires.ftc.teamcode.api
 
 import com.acmerobotics.roadrunner.trajectory.TrajectoryBuilder
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import org.firstinspires.ftc.teamcode.api.hardware.*
+import org.firstinspires.ftc.teamcode.api.framework.HardwareComposition
+import org.firstinspires.ftc.teamcode.api.framework.Telemetry
 
-class Robot(opMode: LinearOpMode) : HardwareComposition(opMode) {
+class Robot(opMode: OpMode) : HardwareComposition(opMode) {
     val telemetry = Telemetry().register()
-    val vision = Vision(opMode, telemetry)
-    val dt = MecanumDrive(opMode, telemetry).register()
-    val fg = FoundationGrabber(opMode, telemetry).register()
-    //val lift = Lift(opMode, telemetry).register()
+    //val vision = Vision(opMode, telemetry)
+    val dt = Drivetrain(opMode.hardwareMap, telemetry).register()
+    val fg = FoundationGrabber(opMode.hardwareMap, telemetry).register()
+    val intake = Intake(opMode.hardwareMap, telemetry)
+    val lift = Lift(opMode.hardwareMap, telemetry)
+    val depositor = Depositor(opMode.hardwareMap).register()
 
     inline fun execute(func: Robot.() -> Unit) {
         func()
@@ -19,9 +24,9 @@ class Robot(opMode: LinearOpMode) : HardwareComposition(opMode) {
     // Convenience functions
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
-    fun splineToSync(x: Double? = null, y: Double? = null, heading: Double? = null,
-                     reverse: Boolean = false, forceTan: Boolean = false) = execute {
-        dt.splineTo(x, y, heading, reverse, forceTan)
+    fun driveToSync(x: Double? = null, y: Double? = null, heading: Double? = null,
+                    approach: Double? = null, tan: Boolean = false, linear: Boolean = false) = execute {
+        dt.driveTo(x, y, heading, approach, tan, linear)
     }
 
     inline fun driveSync(setup: TrajectoryBuilder.() -> Unit) = execute { dt.drive(setup) }
@@ -31,12 +36,13 @@ class Robot(opMode: LinearOpMode) : HardwareComposition(opMode) {
     fun relTurnSync(angle: Double) = execute { dt.relTurn(angle) }
 
     // Shakes the robot to get the intake to drop
-    fun dropIntake() = execute {
-        dt.drive {
-            forward(2.0)
-            back(2.0)
-        }
+    fun dropIntake() = dt.drive {
+        forward(4.0)
+        back(4.0)
     }
 
-    fun stop() = dt.stop()
+    fun stop() {
+        dt.stop()
+        //vision.destroy()
+    }
 }

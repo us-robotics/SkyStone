@@ -1,9 +1,9 @@
 package org.firstinspires.ftc.teamcode.api
 
 import com.acmerobotics.dashboard.FtcDashboard
-import com.acmerobotics.dashboard.config.Config
-import com.acmerobotics.dashboard.telemetry.TelemetryPacket
-import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous
+import com.qualcomm.robotcore.eventloop.opmode.OpMode
+import com.qualcomm.robotcore.hardware.HardwareMap
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName
 import org.firstinspires.ftc.teamcode.api.DeviceNames.WEBCAM
 import org.firstinspires.ftc.teamcode.api.VisionConstants.BLUR_RADIUS
@@ -15,18 +15,21 @@ import org.firstinspires.ftc.teamcode.api.VisionConstants.Stage.*
 import org.firstinspires.ftc.teamcode.api.VisionConstants.VisionScalar
 import org.firstinspires.ftc.teamcode.api.VisionConstants.THRESHOLD_MAX
 import org.firstinspires.ftc.teamcode.api.VisionConstants.THRESHOLD_MIN
+import org.firstinspires.ftc.teamcode.api.framework.Telemetry
+import org.firstinspires.ftc.teamcode.api.framework.TelemetrySource
+import org.firstinspires.ftc.teamcode.api.framework.noop
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import org.openftc.easyopencv.OpenCvCameraBase
 import org.openftc.easyopencv.OpenCvCameraFactory
 import org.openftc.easyopencv.OpenCvPipeline
 
-class Vision(opmode: LinearOpMode, telemetry: Telemetry? = null) {
-    private val cameraPreviewId = opmode.hardwareMap.appContext.resources.getIdentifier(
+class Vision(hardwareMap: HardwareMap, telemetry: Telemetry? = null) {
+    private val cameraPreviewId = hardwareMap.appContext.resources.getIdentifier(
             "cameraMonitorViewId", "id",
-            opmode.hardwareMap.appContext.packageName)
+            hardwareMap.appContext.packageName)
     private val webcam = OpenCvCameraFactory.getInstance()!!.createWebcam(
-            opmode.hardwareMap[WebcamName::class.java, WEBCAM], cameraPreviewId) as OpenCvCameraBase
+            hardwareMap[WebcamName::class.java, WEBCAM], cameraPreviewId) as OpenCvCameraBase
 
     private val pipeline = VisionPipeline()
     val position: VisionPipeline.Position
@@ -55,7 +58,6 @@ class Vision(opmode: LinearOpMode, telemetry: Telemetry? = null) {
     }
 }
 
-@Config
 class VisionPipeline : OpenCvPipeline() {
 
     enum class Position {
