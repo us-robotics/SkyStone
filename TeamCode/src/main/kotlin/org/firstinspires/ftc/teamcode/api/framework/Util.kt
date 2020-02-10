@@ -29,14 +29,18 @@ fun <T : DcMotor> T.init(reverse: Boolean = false, useEncoder: Boolean = true) =
     zeroPowerBehavior = DcMotor.ZeroPowerBehavior.BRAKE
 }
 
-fun LinearOpMode.waitForStart(robot: Robot): Boolean {
+fun LinearOpMode.runBeforeStart(cmd: () -> Unit) : Boolean {
     try {
-        while (!isStarted) robot.telemetry.update()
+        while (!isStarted) cmd()
     } catch (e: InterruptedException) {
         Thread.currentThread().interrupt()
         return false
     }
     return !isStopRequested
+}
+
+fun LinearOpMode.waitForStart(robot: Robot): Boolean = runBeforeStart {
+    robot.telemetry.update()
 }
 
 /**

@@ -12,7 +12,7 @@ class Robot(opMode: OpMode) : HardwareComposition(opMode) {
     val dt = Drivetrain(opMode.hardwareMap, telemetry).register()
     val fg = FoundationGrabber(opMode.hardwareMap, telemetry).register()
     val intake = Intake(opMode.hardwareMap, telemetry)
-    val lift = Lift(opMode.hardwareMap, telemetry)
+    //val lift = Lift(opMode.hardwareMap, telemetry)
     val depositor = Depositor(opMode.hardwareMap).register()
 
     inline fun execute(func: Robot.() -> Unit) {

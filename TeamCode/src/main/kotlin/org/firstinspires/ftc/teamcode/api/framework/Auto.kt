@@ -1,10 +1,12 @@
 package org.firstinspires.ftc.teamcode.api.framework
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode
+import com.qualcomm.robotcore.util.Range
 import org.firstinspires.ftc.teamcode.api.Robot
 import org.firstinspires.ftc.teamcode.api.ToggleableGamepad
 import org.firstinspires.ftc.teamcode.api.ToggleableGamepad.Mode.DEBOUNCE
 import org.firstinspires.ftc.teamcode.api.ToggleableGamepad.Mode.TOGGLE
+import java.util.*
 import kotlin.math.abs
 
 interface Auto {
@@ -22,43 +24,43 @@ abstract class MirrorableAuto(val mirror: Boolean) : Auto {
 
 abstract class Configurator : LinearOpMode() {
     // Default config variables
-    val delay = number("Delay Before Start", delta = 0.25)
-    val mirror = toggle("Red Side")
-
-    private val gamepad = ToggleableGamepad(gamepad1,
-            rbMode = DEBOUNCE, lbMode = DEBOUNCE, aMode = TOGGLE)
+    private val variables = mutableMapOf<String, Configurable<*>>()
+    private val delay = number("Delay Before Start", delta = 0.25)
+    val mirror = toggle("On Red Side")
 
     abstract fun build(): Auto
 
     override fun runOpMode() {
-        val robot = Robot(this)
         AutoTransition.setup(this, "TeleOp")
+        val robot = Robot(this)
 
         // Configure the autonomous
         var idx = 0
         var editing = false
         val varList = variables.toList()
-        while (!isStopRequested) {
+        val gamepad = ToggleableGamepad(gamepad1, rbMode = DEBOUNCE, lbMode = DEBOUNCE,
+                aMode = TOGGLE)
+        while (!isStopRequested && !gamepad1.start) {
+            // Load in and display the option
             val (name, opt) = varList[idx]
+            telemetry.addData("State", if (editing) "Editing" else "Selecting")
             telemetry.addData("Option", name)
             telemetry.addData("Value", opt.value)
+            telemetry.update()
 
-            if (!editing) when {
-                gamepad.leftBumper.value -> idx--
-                gamepad.rightBumper.value -> idx++
-            }
-            else when {
+            // Change the active option or its value
+            gamepad.update() // Lock in the newest values for the gamepad
+            editing = gamepad.a.value
+            if (!editing) {
+                when {
+                    gamepad.leftBumper.value -> idx--
+                    gamepad.rightBumper.value -> idx++
+                }
+                idx = idx.coerceIn(0, varList.size - 1)
+            } else when {
                 gamepad.leftBumper.value -> opt.dec()
                 gamepad.rightBumper.value -> opt.inc()
             }
-
-            if (editing)
-                telemetry.addData("State", "PRESS LB/RB TO ADJUST THE VALUE OR [A] TO CONFIRM")
-            else
-                telemetry.addData("State", "PRESS [A] TO EDIT THIS OPTION OR LB/RB TO SELECT ANOTHER")
-
-            editing = gamepad.a.value
-            telemetry.update()
         }
         val auto = build()
 
@@ -83,8 +85,6 @@ abstract class Configurator : LinearOpMode() {
         fun dec()
     }
 
-    private val variables = mutableMapOf<String, Configurable<*>>()
-
     protected fun toggle(name: String, default: Boolean = false): Configurable<Boolean> {
         val configurable = object : Configurable<Boolean> {
             override var value: Boolean = default
@@ -100,19 +100,20 @@ abstract class Configurator : LinearOpMode() {
         return configurable
     }
 
-    protected fun number(name: String, default: Double = 0.0, min: Double = Double.MIN_VALUE,
-                         max: Double = Double.MAX_VALUE, delta: Double = 1.0): Configurable<Double> {
+    protected fun number(name: String, default: Double = 0.0, min: Double = 0.0,
+                         max: Double = 100.0, delta: Double = 1.0): Configurable<Double> {
         val configurable = object : Configurable<Double> {
             override var value: Double = default
+                set(value) {
+                    field = value.coerceIn(min, max)
+                }
 
             override fun inc() {
                 value += delta
-                if (value > max) value = min
             }
 
             override fun dec() {
                 value -= delta
-                if (value < min) value = max
             }
         }
         variables[name] = configurable

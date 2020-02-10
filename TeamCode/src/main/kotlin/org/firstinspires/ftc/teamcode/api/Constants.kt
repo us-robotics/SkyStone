@@ -53,12 +53,13 @@ object DeviceNames {
     const val LIFT_L = "motorLiftLeft"
     const val LIFT_R = "motorLiftRight"
 
-    const val FOURBAR_LEFT = "fourbarLeft"
-    const val FOURBAR_RIGHT = "fourbarRight"
-    const val GRABBER = "grabber"
+    const val FOURBAR_LEFT = "servoFourbarLeft"
+    const val FOURBAR_RIGHT = "servoFourbarRight"
+    const val GRABBER = "servoGrabber"
 
     const val INTAKE_L = "motorIntakeLeft"
     const val INTAKE_R = "motorIntakeRight"
+    const val INTAKE_BOUNCE = "motorIntakeBounce"
 
     const val FOUNDATION_GRABBER_L = "servoFGLeft"
     const val FOUNDATION_GRABBER_R = "servoFGRight"
@@ -70,7 +71,7 @@ object DeviceNames {
 
     const val ODOM_L = INTAKE_L
     const val ODOM_R = INTAKE_R
-    const val ODOM_H = LIFT_R
+    const val ODOM_H = INTAKE_BOUNCE
 }
 
 @MotorType(ticksPerRev = 537.6, gearing = 19.2, maxRPM = 312.0, orientation = Rotation.CCW)

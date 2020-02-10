@@ -19,10 +19,8 @@ class TeleOp : OpMode() {
         get() = sign(this) * this * this
 
     private lateinit var robot: Robot
-
-    // Gamepads with toggleable buttons
-    private val gamepadDrive = ToggleableGamepad(gamepad1, rbMode = TOGGLE)
-    private val gamepadAux = ToggleableGamepad(gamepad2, aMode = TOGGLE)
+    private lateinit var gamepadDrive: ToggleableGamepad
+    private lateinit var gamepadAux: ToggleableGamepad
 
     // Set up the robot
     override fun init() {
@@ -32,6 +30,10 @@ class TeleOp : OpMode() {
             depositor.position = DOWN
             fg.grabbing = true
         }
+
+        // Gamepads with toggleable buttons
+        gamepadDrive = ToggleableGamepad(gamepad1, rbMode = TOGGLE)
+        gamepadAux = ToggleableGamepad(gamepad2, aMode = TOGGLE)
     }
 
     override fun loop() = robot.run {
@@ -47,7 +49,7 @@ class TeleOp : OpMode() {
 
         // Aux. systems
         intake.power = gamepadAux.rightStickY
-        lift.power = -gamepadAux.leftStickY // TODO: Make this not bad
+        //lift.power = -gamepadAux.leftStickY // TODO: Make this not bad
         fg.grabbing = !gamepadDrive.rightBumper.value
         depositor.grabbing = gamepadAux.a.value
 
@@ -60,5 +62,7 @@ class TeleOp : OpMode() {
 
         // Update the hardware and telemetry
         update()
+        gamepadDrive.update()
+        gamepadAux.update()
     }
 }

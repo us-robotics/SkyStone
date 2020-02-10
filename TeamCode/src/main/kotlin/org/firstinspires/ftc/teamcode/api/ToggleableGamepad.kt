@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.api
 
-import android.text.style.UpdateAppearance
 import com.qualcomm.robotcore.hardware.Gamepad
 import org.firstinspires.ftc.teamcode.api.ToggleableGamepad.Mode.NORMAL
 import org.firstinspires.ftc.teamcode.api.ToggleableGamepad.Mode.TOGGLE
@@ -20,11 +19,10 @@ class ToggleableGamepad(
         rbMode: Mode = NORMAL,
         lbMode: Mode = NORMAL,
 
-        dpUpMode: Mode = NORMAL,
-        dpDownMode: Mode = NORMAL,
-        dpLeftMode: Mode = NORMAL,
-        dpRightMode: Mode = NORMAL
+        dpadMode: Mode = NORMAL
 ): UpdatableComposition() {
+    init { update() }
+
     val a = initBtn(aMode) { a }
     val b = initBtn(bMode) { b }
     val x = initBtn(xMode) { x }
@@ -33,10 +31,10 @@ class ToggleableGamepad(
     val rightBumper = initBtn(rbMode) { right_bumper }
     val leftBumper = initBtn(lbMode) { left_bumper }
 
-    val dpadUp = initBtn(dpUpMode) { dpad_up }
-    val dpadDown = initBtn(dpUpMode) { dpad_down }
-    val dpadLeft = initBtn(dpUpMode) { dpad_left }
-    val dpadRight = initBtn(dpUpMode) { dpad_right }
+    val dpadUp = initBtn(dpadMode) { dpad_up }
+    val dpadDown = initBtn(dpadMode) { dpad_down }
+    val dpadLeft = initBtn(dpadMode) { dpad_left }
+    val dpadRight = initBtn(dpadMode) { dpad_right }
 
     val leftStickX: Double
         get() = gamepad.left_stick_x.toDouble()
@@ -99,9 +97,9 @@ class ToggleableGamepad(
     }
 
     private fun initBtn(mode: Mode, query: Gamepad.() -> Boolean) = when (mode) {
-        NORMAL -> Passthrough(query)
-        TOGGLE -> Toggle(query)
-        DEBOUNCE -> Debounce(query)
+        NORMAL -> Passthrough(query).register()
+        TOGGLE -> Toggle(query).register()
+        DEBOUNCE -> Debounce(query).register()
     }
 
 }

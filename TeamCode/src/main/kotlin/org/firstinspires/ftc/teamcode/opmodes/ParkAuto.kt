@@ -35,7 +35,7 @@ open class ParkAutoBase(mirror: Boolean, val center: Boolean, val zone: Zone) : 
 
 @Autonomous(name = "Park Auto", group = "Config")
 class ParkAuto : Configurator() {
-    private val zone = toggle("Foundation Side")
+    private val zone = toggle("On Foundation Side")
     private val center = toggle("Park Towards Center")
 
     override fun build() = ParkAutoBase(
